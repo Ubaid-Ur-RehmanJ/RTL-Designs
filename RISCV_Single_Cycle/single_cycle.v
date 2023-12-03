@@ -31,11 +31,12 @@
 module single_cycle (input clk, rst);
   
   wire [31:0] PC_Next, PC, PCPlus4, instr, immExt, srcA, srcB, aluResult, readData;
+  wire [31:0] writeData, result, PCTarget;
   wire [1:0] aluOp;    
   wire [6:0] op, funct7;       
   wire [2:0] funct3;
   wire [2:0] aluControl;     
-  wire zero;
+  wire zero, pcSrc;
   //input wire [6:0] op,
   wire regWrite, aluSrc, memWrite, resultSrc, branch; 
   wire [1:0] immSrc;//, aluOp
@@ -44,16 +45,17 @@ module single_cycle (input clk, rst);
   controlUnit cu (
     //.aluOp(),
     .op(instr[6:0]), 
-    .funct7(),       //instr[6:0]
+    .funct7(instr[6:0]),       //instr[6:0]
     .funct3(instr[14:12]),
     .aluControl(aluControl),
-    //.zero(),
+    .zero(zero),
     //input wire [6:0] op,
     .regWrite(regWrite),    //regWrite
-    .aluSrc(),      //aluSrc
-    .memWrite(),     //memWrite
-    .resultSrc(),       //resultSrc
-    .branch(), 
+    .aluSrc(aluSrc),      //aluSrc
+    .memWrite(memWrite),     //memWrite
+    .resultSrc(resultSrc),       //resultSrc
+    .branch(branch),
+    .pcSrc(pcSrc), 
     .immSrc(immSrc)//, aluOp   immSrc
   );
   
@@ -82,11 +84,11 @@ module single_cycle (input clk, rst);
     .we3(regWrite),    //regWrite
     .rst(rst),
     .A1(instr[19:15]), 
-    .A2(), 
+    .A2(instr[24:20]), 
     .A3(instr[11:7]),   //instr[11:7]
-    .WD3(readData),    //readData
+    .WD3(result),    //readData
     .RD1(srcA),    //srcA
-    .RD2()
+    .RD2(writeData)
   );
   
   signExtend sign (
@@ -103,18 +105,47 @@ module single_cycle (input clk, rst);
     .ALUControl(aluControl),
     .OverFlow(),
     .Carry(),
-    .Zero(),
+    .zero(zero),
     .Negative()
   );
   
   
   dataMem mem (
     .clk(clk), 
-    .we(), 
+    .we(memWrite), 
     .rst(rst),
     .A(aluResult), 
-    .WD(),
+    .WD(writeData),
     .RD(readData)
+  );
+  
+  
+  mux muxAfterReg (
+  .a(writeData),
+  .b(immExt),
+  .sel(aluSrc),
+  .out(srcB)
+  );
+  
+  mux muxAfterDataMem (
+  .a(aluResult),
+  .b(readData),
+  .sel(resultSrc),
+  .out(result)
+  );
+  
+  
+  pcTarget pcTarget (
+  .PC(PC),
+  .immExt(immExt),
+  .PCTarget(PCTarget)
+  );
+  
+  mux muxBeforePC (
+  .a(PCPlus4),
+  .b(PCTarget),
+  .sel(pcSrc),
+  .out(PC_Next)
   );
   
 endmodule
